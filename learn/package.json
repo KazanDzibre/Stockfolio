@@ -1,0 +1,14 @@
+{
+  "name": "@stockfolio/learn",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "app1": "tsx watch 01-hello/server.ts"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6"
+  },
+  "dependencies": {
+    "express": "^5.3.0"
+  }
+}
