@@ -1,0 +1,85 @@
+// tsconfig.base.json: shared TypeScript settings for every package and service.
+// Each package has its own tsconfig.json that "extends" this file and adds rootDir/outDir.
+{
+  "compilerOptions": {
+    /* ---------- Language & environment ---------- */
+
+    // Which JS version to emit. Node 26 runs ES2024 natively, so TS doesn't rewrite modern syntax.
+    // Pinned instead of "esnext" so a TypeScript upgrade can't silently change the output.
+    "target": "es2024",
+
+    // Built-in type definitions available to our code. ES2024 only, with no DOM,
+    // so using `window` or `document` in backend code is a compile error.
+    "lib": ["es2024"],
+
+    // Global type packages to load. "node" gives types for process, Buffer, etc.
+    // (they come from @types/node).
+    "types": ["node"],
+
+    /* ---------- Modules ---------- */
+
+    // Follow Node's own module rules: ESM when package.json has "type": "module".
+    // Requires .js extensions in relative imports. Also sets moduleResolution to nodenext.
+    "module": "nodenext",
+
+    // Imports are emitted exactly as written. Type-only imports must use `import type`,
+    // otherwise they stay in the output. Makes output predictable for file-by-file tools like tsx.
+    // (Implies isolatedModules.)
+    "verbatimModuleSyntax": true,
+
+    // Treat every file as a module with its own scope, never as a global script.
+    "moduleDetection": "force",
+
+    // Error if a side-effect import (`import './setup.js'`) points to a file that doesn't exist.
+    "noUncheckedSideEffectImports": true,
+
+    // Allow `import data from './file.json' with { type: 'json' }` with typed results.
+    "resolveJsonModule": true,
+
+    /* ---------- Type checking ---------- */
+
+    // Enables the whole strict family (strictNullChecks, noImplicitAny, etc.).
+    // Rejects unsafe patterns at compile time. Types only, no effect on runtime behavior.
+    "strict": true,
+
+    // Reading by index (arr[0], map[key]) returns `T | undefined`, because the element may not exist.
+    "noUncheckedIndexedAccess": true,
+
+    // `x?: string` means "may be missing", NOT "may be explicitly undefined".
+    // To allow an explicit undefined, write `x?: string | undefined`.
+    "exactOptionalPropertyTypes": true,
+
+    // Methods that override a base-class method must use the `override` keyword,
+    // so renaming the base method breaks loudly instead of silently.
+    "noImplicitOverride": true,
+
+    // Every code path in a function with a return type must return a value.
+    "noImplicitReturns": true,
+
+    // A switch case that falls through to the next case without break/return is an error.
+    "noFallthroughCasesInSwitch": true,
+
+    // Unused variables and parameters are left to ESLint (a warning), so they don't fail the build.
+
+    /* ---------- Output ---------- */
+
+    // Emit .d.ts type files, so other workspace packages get types when they import this package.
+    "declaration": true,
+
+    // Map .d.ts back to the .ts source, so "go to definition" opens the real code, not the .d.ts.
+    "declarationMap": true,
+
+    // Emit .map files so runtime stack traces point to TS lines, not compiled JS lines.
+    "sourceMap": true,
+
+    /* ---------- Performance & interop ---------- */
+
+    // Don't typecheck .d.ts files inside node_modules. Faster builds, and no errors
+    // from third-party typings we can't fix anyway.
+    "skipLibCheck": true,
+
+    // Error if two imports refer to the same file with different letter casing.
+    // Prevents "works on Mac, breaks on Linux CI" bugs.
+    "forceConsistentCasingInFileNames": true,
+  },
+}

@@ -1,83 +1,66 @@
-# Local development stores for Stockfolio.
-# The app itself runs on the host (node --watch), so every port below is
-# published and every connection URL in .env points at localhost.
-#
-# No `version:` key — obsolete in Compose v2 and warns if present.
+# Local infrastructure for Stockfolio development.
+# Usage: docker compose up -d   |   docker compose down   |   docker compose down -v (also wipes data)
 
 name: stockfolio
 
 services:
-  postgres:
-    image: postgres:18
-    container_name: stockfolio-postgres
-    restart: unless-stopped
-    ports:
-      - "${POSTGRES_PORT}:5432"
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    volumes:
-      # NOTE: postgres:18 sets PGDATA=/var/lib/postgresql/18/docker and declares
-      # its volume at /var/lib/postgresql — NOT the /var/lib/postgresql/data path
-      # every pre-18 example uses. Mounting .../data here would mount an empty
-      # unused directory and drop the real data into an anonymous volume that is
-      # orphaned on the next `down`/`up`. Mount the parent.
-      - pgdata:/var/lib/postgresql
-    healthcheck:
-      # $$ escapes to a literal $ so the container's shell expands it, not Compose.
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      # The postgres entrypoint starts a temporary server to run initdb, then
-      # restarts it. Without a start_period, pg_isready can pass against that
-      # temporary server and report healthy before the real one is up.
-      start_period: 30s
-      start_interval: 1s
+    postgres:
+        image: postgres:18
+        restart: unless-stopped
+        environment:
+            POSTGRES_USER: ${POSTGRES_USER}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+            POSTGRES_DB: ${POSTGRES_DB}
+        ports:
+            - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+        volumes:
+            # Postgres 18+ expects the mount at /var/lib/postgresql (NOT .../data as in older versions)
+            - postgres_data:/var/lib/postgresql
+        healthcheck:
+            # $$ = read the variable inside the container, not from Compose's .env at parse time
+            test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+            interval: 5s
+            timeout: 3s
+            retries: 10
+            start_period: 10s
 
-  redis:
-    image: redis:8-alpine
-    container_name: stockfolio-redis
-    restart: unless-stopped
-    ports:
-      - "${REDIS_PORT}:6379"
-    # AOF on: from Phase 6 this holds BullMQ job state, which should survive a
-    # restart. A pure cache would not need it.
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - redisdata:/data
-    healthcheck:
-      # Piping through grep because redis-cli exits 0 even for some error replies.
-      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-      start_period: 10s
-      start_interval: 1s
+    mongo:
+        image: mongo:8
+        restart: unless-stopped
+        environment:
+            MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+            MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+        ports:
+            - "127.0.0.1:${MONGO_PORT:-27017}:27017"
+        volumes:
+            - mongo_data:/data/db
+        healthcheck:
+            # ping doesn't require auth, so no credentials needed here
+            test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+            interval: 5s
+            timeout: 5s
+            retries: 10
+            start_period: 15s
 
-  mongo:
-    image: mongo:8
-    container_name: stockfolio-mongo
-    restart: unless-stopped
-    ports:
-      - "${MONGO_PORT}:27017"
-    environment:
-      # Setting these enables auth and creates the root user in the `admin` db,
-      # which is why connection strings need ?authSource=admin.
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
-    volumes:
-      - mongodata:/data/db
-    healthcheck:
-      test: ["CMD-SHELL", "mongosh --quiet -u $$MONGO_INITDB_ROOT_USERNAME -p $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval 'db.adminCommand({ping:1}).ok' | grep -q 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-      start_interval: 1s
+    redis:
+        image: redis:8
+        restart: unless-stopped
+        # Password even locally, so connection code is the same as in production.
+        # appendonly = persist data to disk (Redis is in-memory by default).
+        command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--appendonly", "yes"]
+        environment:
+            REDIS_PASSWORD: ${REDIS_PASSWORD}
+        ports:
+            - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+        volumes:
+            - redis_data:/data
+        healthcheck:
+            test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
+            interval: 5s
+            timeout: 3s
+            retries: 10
 
 volumes:
-  pgdata:
-  redisdata:
-  mongodata:
+    postgres_data:
+    mongo_data:
+    redis_data:

@@ -1,0 +1,13 @@
+// Package-level config: inherits all compiler settings from the root,
+// and only adds what's specific to this package.
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Source lives here. Keeps dist/ flat (dist/index.js, not dist/src/index.js).
+    "rootDir": "src",
+    // Compiled JS, .d.ts and .map files go here.
+    "outDir": "dist",
+  },
+  // Only compile files inside src/.
+  "include": ["src"],
+}
